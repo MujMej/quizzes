@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="bs">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kvizovi — Cyber Edu</title>
+  <link rel="stylesheet" href="../style.css" />
+  <link rel="stylesheet" href="./quiz.css" />
+</head>
+<body>
+  <nav class="q-nav">
+    <div class="logo">Cyber Edu — Kvizovi</div>
+    <div class="nav-right">
+      <a class="btn btn-color-2" href="../">Nazad</a>
+    </div>
+  </nav>
+
+  <main class="q-wrap">
+    <section class="q-card">
+      <h1 class="q-title">Odaberi uzrast</h1>
+
+      <div class="q-row">
+        <button class="btn btn-color-1" id="groupA">Grupa A (9–11)</button>
+        <button class="btn btn-color-2" id="groupB">Grupa B (11–15)</button>
+      </div>
+
+      <p class="q-note">
+        Svaka tema ima <strong>Kviz A</strong> i <strong>Kviz B</strong> (poslije 2 dijela prezentacije).
+        Max 10 minuta • 5 pitanja • 100 bodova.
+      </p>
+    </section>
+
+    <section class="q-card">
+      <h2 class="q-subtitle">Teme</h2>
+      <div id="topicList" class="topic-list"></div>
+    </section>
+  </main>
+
+  <script src="./data.js"></script>
+  <script src="./quiz.js"></script>
+</body>
+</html>
