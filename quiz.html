@@ -1,64 +1,86 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="bs">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Kviz</title>
-  <link rel="stylesheet" href="../style.css" />
-  <link rel="stylesheet" href="./quiz.css" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quiz</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="quiz.css" />
 </head>
 <body>
-  <nav class="q-nav">
-    <div class="logo" id="quizHeader">Kviz</div>
+  <nav>
+    <div class="logo" id="navTitle">Quiz</div>
     <div class="nav-right">
-      <div class="dark-toggle" id="themeToggle" onclick="toggleDarkMode()">Light</div>
-      <a class="btn btn-color-2" href="./">Teme</a>
+      <a class="badge" href="./" style="text-decoration:none;">↩ Teme</a>
+      <div class="dark-toggle" id="themeToggle">Dark mode</div>
     </div>
   </nav>
 
-  <main class="q-wrap">
-    <!-- QR Gate -->
-    <section class="q-card" id="qrGate">
-      <h1 class="q-title">Skeniraj QR za pristup</h1>
-      <p class="q-note">Ovo je “soft” verifikacija za radionicu: skeniranje + kod.</p>
+  <div class="container">
+    <!-- QR GATE -->
+    <div class="card" id="gateCard">
+      <div class="h1">🔎 Verifikacija (QR)</div>
+      <div class="sub">Kviz se otključava nakon skeniranja QR koda i unosa koda (soft verifikacija).</div>
 
-      <div class="qr-box">
-        <canvas id="qrCanvas" width="220" height="220"></canvas>
+      <div class="qrBox">
+        <div class="qrFrame">
+          <img id="qrImg" class="qr" alt="QR code" />
+        </div>
+
+        <div>
+          <div class="label">1) Skener na telefonu</div>
+          <div class="note">
+            Učenik skenira QR → na telefonu će se prikazati kod → ti uneseš kod ovdje.
+          </div>
+
+          <div style="height:12px;"></div>
+
+          <div class="label">2) Unesi kod sa telefona</div>
+          <input class="input" id="gateCode" placeholder="npr. 4Q7K" maxlength="12" />
+          <div class="row" style="margin-top:12px;">
+            <button class="btn btn-primary" id="unlockBtn">Otključaj kviz</button>
+            <button class="btn btn-outline" id="regenBtn">Novi QR</button>
+          </div>
+
+          <div style="height:12px;"></div>
+          <div id="gateMsg" class="alert" style="display:none;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- QUIZ -->
+    <div class="card" id="quizCard" style="display:none;">
+      <div class="topbar">
+        <div>
+          <div class="badge" id="whoBadge">👤</div>
+          <div class="small" id="metaLine"></div>
+        </div>
+        <div class="row">
+          <span class="badge">⏱ <span id="timeLeft">10:00</span></span>
+          <span class="badge">⭐ Bodovi: <span id="liveScore">0</span>/100</span>
+          <button class="btn btn-outline" id="fullscreenBtn" title="Full screen">⛶ Full screen</button>
+        </div>
       </div>
 
-      <div class="q-row">
-        <input class="q-input" id="gateCode" placeholder="Unesi kod (npr. Cyb£RXeRoy!26)" />
-        <button class="btn btn-color-1" id="unlockBtn">Otključaj</button>
+      <div class="progress"><div id="progressBar"></div></div>
+
+      <div class="qbox">
+        <div class="qtitle" id="qTitle"></div>
+        <div id="options"></div>
+        <div class="note" id="helperNote"></div>
       </div>
 
-      <p class="q-hint" id="gateHint"></p>
-    </section>
-
-    <!-- Quiz -->
-    <section class="q-card hidden" id="quizCard">
-      <div class="q-topbar">
-        <div class="q-chip" id="roomChip">SOBA</div>
-        <div class="q-timer" id="timer">10:00</div>
+      <div class="row" style="justify-content:space-between; margin-top:16px;">
+        <button class="btn btn-outline" id="prevBtn">← Nazad</button>
+        <button class="btn btn-primary" id="nextBtn">Dalje →</button>
       </div>
 
-      <div class="q-progress">
-        <div class="q-progress-bar" id="progressBar"></div>
-      </div>
+      <div style="height:10px;"></div>
+      <div class="note">Napomena: ovo je front-end sistem bez servera — “download blokada” nije moguća 100% na webu. Ali kviz + certifikacija mogu.</div>
+    </div>
+  </div>
 
-      <h1 class="q-title" id="quizTitle">Tema</h1>
-      <p class="q-note" id="quizDesc"></p>
-
-      <div id="questionHost"></div>
-
-      <div class="q-row q-actions">
-        <button class="btn btn-color-2" id="prevBtn">Nazad</button>
-        <button class="btn btn-color-1" id="nextBtn">Dalje</button>
-      </div>
-    </section>
-  </main>
-
-  <script src="../script.js"></script>
-  <script src="./data.js"></script>
-  <script src="./quiz.js"></script>
+  <script src="data.js"></script>
+  <script src="quiz.js"></script>
 </body>
 </html>
