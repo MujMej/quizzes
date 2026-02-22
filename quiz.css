@@ -1,0 +1,124 @@
+/* koristi tvoje varijable iz style.css */
+.q-nav{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:1rem 5%;
+  background: var(--primary);
+  position: sticky; top:0; z-index: 50;
+}
+
+.q-wrap{
+  padding: 40px 5%;
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.q-card{
+  background: var(--card);
+  box-shadow: 0 10px 30px var(--shadow);
+  border-radius: 20px;
+  padding: 26px;
+  margin: 18px 0;
+}
+
+.q-title{ color: var(--primary); font-size: 2rem; margin-bottom: 10px; }
+.q-subtitle{ color: var(--primary); margin-bottom: 12px; }
+.q-note{ opacity: .9; margin: 10px 0 0; }
+
+.topic-list{ display:flex; flex-direction: column; gap: 14px; }
+
+.topic-item{
+  border: 2px solid rgba(15,107,82,.20);
+  border-radius: 16px;
+  padding: 16px;
+  display:flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.topic-head{
+  display:flex; justify-content:space-between; align-items:flex-start; gap: 10px;
+}
+.topic-name{ font-weight: 700; color: var(--text); }
+.topic-room{ color: var(--primary); font-weight: 600; }
+
+.topic-actions{ display:flex; gap: 10px; flex-wrap: wrap; }
+
+.q-row{ display:flex; gap: 12px; flex-wrap: wrap; align-items:center; margin-top: 14px; }
+
+.q-input{
+  flex: 1;
+  min-width: 220px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 2px solid rgba(15,107,82,.25);
+  background: transparent;
+  color: var(--text);
+  outline: none;
+}
+
+.q-hint{ margin-top: 10px; color: var(--primary); font-weight: 600; }
+
+.hidden{ display:none; }
+
+.q-topbar{
+  display:flex; justify-content:space-between; align-items:center;
+  margin-bottom: 12px;
+}
+
+.q-chip{
+  background: rgba(217,179,90,.18);
+  color: var(--text);
+  border: 1px solid rgba(217,179,90,.35);
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.q-timer{
+  font-weight: 800;
+  color: var(--primary);
+}
+
+.q-progress{
+  height: 10px;
+  background: rgba(15,107,82,.14);
+  border-radius: 999px;
+  overflow:hidden;
+  margin: 10px 0 18px;
+}
+
+.q-progress-bar{
+  height:100%;
+  width:0%;
+  background: var(--accent);
+  transition: width .25s ease;
+}
+
+.q-question{
+  border: 2px solid rgba(15,107,82,.18);
+  border-radius: 16px;
+  padding: 16px;
+  margin: 14px 0;
+}
+
+.q-qtext{ font-weight: 700; margin-bottom: 10px; }
+.q-options{ display:flex; flex-direction: column; gap: 10px; }
+
+.q-opt{
+  display:flex; gap: 10px; align-items:flex-start;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(15,107,82,.18);
+}
+
+.q-opt input{ margin-top: 3px; }
+.q-actions{ justify-content: space-between; }
+
+/* QR */
+.qr-box{
+  width: 240px; height: 240px;
+  border-radius: 20px;
+  border: 2px dashed rgba(15,107,82,.35);
+  display:grid; place-items:center;
+  margin: 16px auto;
+}
