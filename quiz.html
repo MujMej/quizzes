@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="bs">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kviz</title>
+  <link rel="stylesheet" href="../style.css" />
+  <link rel="stylesheet" href="./quiz.css" />
+</head>
+<body>
+  <nav class="q-nav">
+    <div class="logo" id="quizHeader">Kviz</div>
+    <div class="nav-right">
+      <div class="dark-toggle" id="themeToggle" onclick="toggleDarkMode()">Light</div>
+      <a class="btn btn-color-2" href="./">Teme</a>
+    </div>
+  </nav>
+
+  <main class="q-wrap">
+    <!-- QR Gate -->
+    <section class="q-card" id="qrGate">
+      <h1 class="q-title">Skeniraj QR za pristup</h1>
+      <p class="q-note">Ovo je “soft” verifikacija za radionicu: skeniranje + kod.</p>
+
+      <div class="qr-box">
+        <canvas id="qrCanvas" width="220" height="220"></canvas>
+      </div>
+
+      <div class="q-row">
+        <input class="q-input" id="gateCode" placeholder="Unesi kod (npr. Cyb£RXeRoy!26)" />
+        <button class="btn btn-color-1" id="unlockBtn">Otključaj</button>
+      </div>
+
+      <p class="q-hint" id="gateHint"></p>
+    </section>
+
+    <!-- Quiz -->
+    <section class="q-card hidden" id="quizCard">
+      <div class="q-topbar">
+        <div class="q-chip" id="roomChip">SOBA</div>
+        <div class="q-timer" id="timer">10:00</div>
+      </div>
+
+      <div class="q-progress">
+        <div class="q-progress-bar" id="progressBar"></div>
+      </div>
+
+      <h1 class="q-title" id="quizTitle">Tema</h1>
+      <p class="q-note" id="quizDesc"></p>
+
+      <div id="questionHost"></div>
+
+      <div class="q-row q-actions">
+        <button class="btn btn-color-2" id="prevBtn">Nazad</button>
+        <button class="btn btn-color-1" id="nextBtn">Dalje</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="../script.js"></script>
+  <script src="./data.js"></script>
+  <script src="./quiz.js"></script>
+</body>
+</html>
