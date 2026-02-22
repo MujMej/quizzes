@@ -1,42 +1,69 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="bs">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Kvizovi — Cyber Edu</title>
-  <link rel="stylesheet" href="../style.css" />
-  <link rel="stylesheet" href="./quiz.css" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cyber Edu — Kvizovi</title>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="quiz.css" />
 </head>
 <body>
-  <nav class="q-nav">
+  <nav>
     <div class="logo">Cyber Edu — Kvizovi</div>
     <div class="nav-right">
-      <a class="btn btn-color-2" href="../">Nazad</a>
+      <a class="badge" href="../" style="text-decoration:none;">↩ Nazad na sajt</a>
+      <div class="dark-toggle" id="themeToggle">Dark mode</div>
     </div>
   </nav>
 
-  <main class="q-wrap">
-    <section class="q-card">
-      <h1 class="q-title">Odaberi uzrast</h1>
+  <div class="container">
+    <div class="card">
+      <div class="h1">Učenik / Učenica</div>
+      <div class="sub">Unesi ime i izaberi grupu. Rezultati se pamte lokalno u browseru (bez servera).</div>
 
-      <div class="q-row">
-        <button class="btn btn-color-1" id="groupA">Grupa A (9–11)</button>
-        <button class="btn btn-color-2" id="groupB">Grupa B (11–15)</button>
+      <div class="grid">
+        <div>
+          <div class="label">Ime i prezime</div>
+          <input class="input" id="studentName" placeholder="npr. Marko Marković" />
+          <div class="note">Tip: koristi isto ime svaki put (radi certifikacije).</div>
+        </div>
+        <div>
+          <div class="label">Uzrasna grupa</div>
+          <select class="select" id="ageGroup">
+            <option value="A">Grupa A (9–11)</option>
+            <option value="B">Grupa B (11–15)</option>
+          </select>
+          <div class="note">Kviz će automatski učitati pitanja za izabranu grupu.</div>
+        </div>
       </div>
 
-      <p class="q-note">
-        Svaka tema ima <strong>Kviz A</strong> i <strong>Kviz B</strong> (poslije 2 dijela prezentacije).
-        Max 10 minuta • 5 pitanja • 100 bodova.
-      </p>
-    </section>
+      <hr class="sep"/>
 
-    <section class="q-card">
-      <h2 class="q-subtitle">Teme</h2>
-      <div id="topicList" class="topic-list"></div>
-    </section>
-  </main>
+      <div class="row" style="justify-content:space-between;">
+        <div>
+          <span class="badge">⏱ 10 min po kvizu</span>
+          <span class="badge">✅ prolaz: 60/100</span>
+          <span class="badge">🎯 5 pitanja</span>
+        </div>
+        <button class="btn btn-outline" id="resetLocal">Resetuj rezultate (ovaj browser)</button>
+      </div>
+    </div>
 
-  <script src="./data.js"></script>
-  <script src="./quiz.js"></script>
+    <div style="height:18px;"></div>
+
+    <div class="card">
+      <div class="h1">Teme</div>
+      <div class="sub">Klikni na <b>Quiz A</b> nakon prvog dijela prezentacije, pa <b>Quiz B</b> nakon drugog dijela.</div>
+
+      <div id="topicsList" style="display:flex; flex-direction:column; gap:14px;"></div>
+    </div>
+  </div>
+
+  <div class="footer">
+    with love, MujMej • Emerald + Gold
+  </div>
+
+  <script src="data.js"></script>
+  <script src="quiz.js"></script>
 </body>
 </html>
