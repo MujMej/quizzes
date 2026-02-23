@@ -1,36 +1,187 @@
 <!DOCTYPE html>
-<html lang="bs">
+<html lang="sr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>QR Verifikacija</title>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700;800;900&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="quiz.css" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verifikacija – Cyber Heroji</title>
+  <style>
+    :root {
+      --primary: #10b981;
+      --primary-dark: #059669;
+      --gold: #f59e0b;
+      --bg: #ffffff;
+      --card-bg: #f9fafb;
+      --text: #1f2937;
+      --text-light: #6b7280;
+      --border: #e5e7eb;
+      --shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+    }
+    [data-theme="dark"] {
+      --bg: #111827;
+      --card-bg: #1f2937;
+      --text: #f9fafb;
+      --text-light: #9ca3af;
+      --border: #374151;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, var(--primary), var(--gold));
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 1rem;
+    }
+    .verify-card {
+      background: var(--card-bg);
+      border-radius: 20px;
+      padding: 3rem 2rem;
+      max-width: 500px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      animation: slideIn 0.5s ease-out;
+    }
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    .icon {
+      font-size: 5rem;
+      margin-bottom: 1.5rem;
+      animation: bounce 1s infinite;
+    }
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+    h1 {
+      font-size: 2rem;
+      color: var(--primary);
+      margin-bottom: 1rem;
+    }
+    p {
+      color: var(--text-light);
+      margin-bottom: 2rem;
+      font-size: 1.1rem;
+      line-height: 1.6;
+    }
+    .code-box {
+      background: linear-gradient(135deg, var(--primary), var(--gold));
+      color: #fff;
+      padding: 2rem;
+      border-radius: 12px;
+      margin-bottom: 2rem;
+      box-shadow: var(--shadow);
+    }
+    .code-label {
+      font-size: 0.9rem;
+      opacity: 0.9;
+      margin-bottom: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .code-value {
+      font-size: 3.5rem;
+      font-weight: bold;
+      letter-spacing: 1rem;
+      font-family: "Courier New", monospace;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+    }
+    .instructions {
+      background: rgba(16, 185, 129, 0.1);
+      border-left: 4px solid var(--primary);
+      padding: 1.5rem;
+      border-radius: 8px;
+      text-align: left;
+    }
+    .instructions h2 {
+      color: var(--primary);
+      font-size: 1.25rem;
+      margin-bottom: 1rem;
+    }
+    .instructions ol {
+      margin-left: 1.5rem;
+      color: var(--text);
+    }
+    .instructions li {
+      margin-bottom: 0.75rem;
+    }
+    .btn {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      padding: 1rem 2rem;
+      border-radius: 10px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 2rem;
+      transition: background 0.3s, transform 0.2s;
+      width: 100%;
+    }
+    .btn:hover {
+      background: var(--primary-dark);
+      transform: scale(1.05);
+    }
+    @media (max-width: 600px) {
+      .verify-card { padding: 2rem 1.5rem; }
+      h1 { font-size: 1.75rem; }
+      .code-value { font-size: 2.5rem; letter-spacing: 0.5rem; }
+    }
+  </style>
 </head>
 <body>
-  <nav>
-    <div class="logo">QR Verifikacija</div>
-    <div class="nav-right">
-      <span class="badge">📱 Telefon</span>
+  <div class="verify-card">
+    <div class="icon">🔐</div>
+    <h1>Kod za pristup kvizu</h1>
+    <p>Unesi ovaj kod u kviz da bi započeo test!</p>
+    
+    <div class="code-box">
+      <div class="code-label">Tvoj kod</div>
+      <div class="code-value" id="displayCode">----</div>
     </div>
-  </nav>
 
-  <div class="container">
-    <div class="card">
-      <div class="h1">Kod za otključavanje</div>
-      <div class="sub">Pokaži ovaj kod edukatoru/na velikom ekranu.</div>
-
-      <div class="card" style="margin-top:12px; text-align:center;">
-        <div style="font-size:3.2rem; font-weight:900; letter-spacing:4px; color:var(--primary);" id="codeBox">----</div>
-        <div class="note">Ako kod ne radi, skeniraj ponovo (edukator može generisati novi QR).</div>
-      </div>
+    <div class="instructions">
+      <h2>📝 Uputstvo</h2>
+      <ol>
+        <li>Zapamti ili zapiši prikazani kod</li>
+        <li>Idi na stranicu kviza</li>
+        <li>Unesi ovaj kod u polje za verifikaciju</li>
+        <li>Započni kviz i sakupi ključ!</li>
+      </ol>
     </div>
+
+    <button class="btn" onclick="copyCode()">📋 Kopiraj kod</button>
   </div>
 
   <script>
-    const params = new URLSearchParams(location.search);
-    const code = (params.get("code") || "").toUpperCase().trim();
-    document.getElementById("codeBox").textContent = code || "----";
+    // Extract code from URL
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code") || "ERROR";
+    
+    document.getElementById("displayCode").textContent = code;
+
+    // Copy code to clipboard
+    function copyCode() {
+      navigator.clipboard.writeText(code).then(() => {
+        alert("✅ Kod kopiran u clipboard!");
+      }).catch(() => {
+        alert("⚠️ Greška pri kopiranju. Ručno zapiši kod.");
+      });
+    }
+
+    // Apply theme
+    const theme = localStorage.getItem("theme") || "light";
+    document.documentElement.setAttribute("data-theme", theme);
   </script>
 </body>
 </html>
