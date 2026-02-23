@@ -1,557 +1,647 @@
-// quiz.js - FINALNA VERZIJA
+// ============================================================================
+// CYBER HEROJI QUIZ ENGINE v2.0
+// ============================================================================
 
-/* ---------------------------
-   Theme toggle
----------------------------- */
-function setTheme(isDark){
-  if(isDark) document.body.classList.add("dark-mode");
-  else document.body.classList.remove("dark-mode");
-  localStorage.setItem("darkMode", String(isDark));
-  const t = document.getElementById("themeToggle");
-  if(t) t.innerText = isDark ? "☀️ Light" : "🌙 Dark";
+// ----------------------------------------------------------------------------
+// 1. GLOBAL STATE & HELPERS
+// ----------------------------------------------------------------------------
+
+let currentState = {
+  studentName: "",
+  groupName: "",
+  topicId: "",
+  currentQuestionIndex: 0,
+  score: 0,
+  answers: [],
+  timeLeft: 0,
+  timerInterval: null
+};
+
+// Safe key generation for localStorage
+function safeKey(str) {
+  return str.replace(/[^a-zA-Z0-9_]/g, "_");
 }
 
-function initTheme(){
-  const saved = localStorage.getItem("darkMode");
-  const isDark = saved === "true";
-  setTheme(isDark);
-  const t = document.getElementById("themeToggle");
-  if(t){
-    t.addEventListener("click", ()=> setTheme(!document.body.classList.contains("dark-mode")));
+// Generate random code
+function genCode(len) {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+  for (let i = 0; i < len; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
   }
+  return code;
 }
 
-/* ---------------------------
-   Helpers
----------------------------- */
-function qs(sel){ return document.querySelector(sel); }
-function qsa(sel){ return Array.from(document.querySelectorAll(sel)); }
-
-function safeKey(...parts){
-  return parts.map(p => String(p || "").trim().toLowerCase().replace(/\s+/g,"_")).join("__");
-}
-
-function getProgressKey(student, group, topicId, part){
-  return "cyberedu_result__" + safeKey(student, group, topicId, part);
-}
-
-function saveResult(student, group, topicId, part, payload){
-  localStorage.setItem(getProgressKey(student, group, topicId, part), JSON.stringify(payload));
-}
-
-function loadResult(student, group, topicId, part){
-  const raw = localStorage.getItem(getProgressKey(student, group, topicId, part));
-  if(!raw) return null;
-  try{ return JSON.parse(raw); }catch{ return null; }
-}
-
-function resetAll(){
-  const keys = Object.keys(localStorage);
-  keys.forEach(k=>{
-    if(k.startsWith("cyberedu_result__")) localStorage.removeItem(k);
-  });
-}
-
-/* ---------------------------
-   QR gate
----------------------------- */
-function genCode(len=4){
-  const chars = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
-  let out = "";
-  for(let i=0;i<len;i++){
-    out += chars[Math.floor(Math.random()*chars.length)];
+// Get or create persistent QR code
+function getPersistentCode(topicId, part) {
+  const key = `qr_code_${topicId}_${part}`;
+  let code = localStorage.getItem(key);
+  if (!code) {
+    code = genCode(4);
+    localStorage.setItem(key, code);
   }
-  return out;
+  return code;
 }
 
-function buildQrUrl(code){
-  const base = location.origin + location.pathname.replace(/\/quiz\.html$/, "/verify.html");
+// Build QR URL - FIXED to point to deployed verify.html
+function buildQrUrl(code) {
+  const base = "https://mujmej.github.io/cyber-heroji/quiz/verify.html";
   return base + "?code=" + encodeURIComponent(code);
 }
 
-function setQrImage(imgEl, qrUrl){
-  const url = "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + encodeURIComponent(qrUrl);
-  imgEl.src = url;
+// ----------------------------------------------------------------------------
+// 2. THEME MANAGEMENT
+// ----------------------------------------------------------------------------
+
+function initTheme() {
+  const toggle = document.getElementById("themeToggle");
+  if (!toggle) return;
+
+  const savedTheme = localStorage.getItem("theme") || "light";
+  document.documentElement.setAttribute("data-theme", savedTheme);
+  toggle.textContent = savedTheme === "dark" ? "☀️" : "🌙";
+
+  toggle.addEventListener("click", () => {
+    const current = document.documentElement.getAttribute("data-theme");
+    const newTheme = current === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", newTheme);
+    localStorage.setItem("theme", newTheme);
+    toggle.textContent = newTheme === "dark" ? "☀️" : "🌙";
+  });
 }
 
-/* ---------------------------
-   Certification check
----------------------------- */
-function checkCertification(student, group){
-  const topics = QUIZ_DATA.topics;
-  let keysCollected = [];
-  
-  topics.forEach(topic => {
-    const resA = loadResult(student, group, topic.id, "A");
-    const resB = loadResult(student, group, topic.id, "B");
-    
-    // ISTA KLJUČ za obe grupe
-    if(resA?.passed || resB?.passed){
-      if(!keysCollected.includes(topic.key)){
-        keysCollected.push(topic.key);
+// ----------------------------------------------------------------------------
+// 3. CERTIFICATION CHECK
+// ----------------------------------------------------------------------------
+
+function checkCertification(studentName, groupName) {
+  if (!studentName || !groupName) return { eligible: false, keys: [] };
+
+  const results = getAllResults().filter(
+    r => r.studentName === studentName && r.groupName === groupName
+  );
+
+  const uniqueKeys = new Set();
+  results.forEach(r => {
+    if (r.passed && r.key) {
+      uniqueKeys.add(r.key);
+    }
+  });
+
+  const collectedKeys = Array.from(uniqueKeys);
+  const eligible = collectedKeys.length >= 10;
+
+  return { eligible, keys: collectedKeys, total: collectedKeys.length };
+}
+
+function getAllResults() {
+  const results = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key.startsWith("quiz_result_")) {
+      try {
+        const data = JSON.parse(localStorage.getItem(key));
+        results.push(data);
+      } catch (e) {
+        console.warn("Invalid result data:", key);
       }
     }
-  });
-  
-  const totalKeys = keysCollected.length;
-  const needsCertificate = totalKeys >= QUIZ_DATA.meta.totalTopics;
-  
-  return {
-    keys: keysCollected,
-    total: totalKeys,
-    eligible: needsCertificate
-  };
+  }
+  return results;
 }
 
-/* ---------------------------
-   INDEX PAGE
----------------------------- */
-function initIndex(){
-  const list = qs("#topicsList");
-  if(!list) return;
+// ----------------------------------------------------------------------------
+// 4. INDEX PAGE (Topic Selection)
+// ----------------------------------------------------------------------------
 
-  const studentName = qs("#studentName");
-  const ageGroup = qs("#ageGroup");
-  const resetBtn = qs("#resetLocal");
+function initIndex() {
+  const container = document.getElementById("topicsContainer");
+  if (!container) return;
 
-  studentName.value = localStorage.getItem("cyberedu_student") || "";
-  ageGroup.value = localStorage.getItem("cyberedu_group") || "A";
+  // Get student info from URL hash or localStorage
+  const hash = location.hash.slice(1);
+  const params = new URLSearchParams(hash);
+  
+  let studentName = params.get("student") || localStorage.getItem("currentStudent") || "";
+  let groupName = params.get("group") || localStorage.getItem("currentGroup") || "";
 
-  function persistForm(){
-    localStorage.setItem("cyberedu_student", studentName.value.trim());
-    localStorage.setItem("cyberedu_group", ageGroup.value);
-  }
+  // Student name input
+  const nameInput = document.getElementById("studentName");
+  const groupSelect = document.getElementById("groupSelect");
+  const startBtn = document.getElementById("startBtn");
+  const resetBtn = document.getElementById("resetAllBtn");
+  const certBtn = document.getElementById("viewCertBtn");
 
-  studentName.addEventListener("input", persistForm);
-  ageGroup.addEventListener("change", ()=>{ persistForm(); render(); });
+  if (nameInput && groupSelect && startBtn) {
+    nameInput.value = studentName;
+    groupSelect.value = groupName;
 
-  resetBtn.addEventListener("click", ()=>{
-    if(confirm("Resetovati sve rezultate?")){
-      resetAll();
-      render();
-    }
-  });
+    startBtn.addEventListener("click", () => {
+      studentName = nameInput.value.trim();
+      groupName = groupSelect.value;
 
-  function render(){
-    list.innerHTML = "";
+      if (!studentName) {
+        alert("⚠️ Molim te unesi svoje ime!");
+        return;
+      }
+      if (!groupName) {
+        alert("⚠️ Molim te izaberi svoju grupu!");
+        return;
+      }
 
-    const s = studentName.value.trim();
-    const g = ageGroup.value;
+      localStorage.setItem("currentStudent", studentName);
+      localStorage.setItem("currentGroup", groupName);
 
-    QUIZ_DATA.topics.forEach(topic=>{
-      const aRes = s ? loadResult(s,g,topic.id,"A") : null;
-      const bRes = s ? loadResult(s,g,topic.id,"B") : null;
+      renderTopics(studentName, groupName);
+      
+      // Check certification
+      const cert = checkCertification(studentName, groupName);
+      if (certBtn) {
+        certBtn.style.display = cert.eligible ? "inline-block" : "none";
+      }
 
-      const aPassed = aRes && aRes.passed;
-      const bPassed = bRes && bRes.passed;
-
-      const wrap = document.createElement("div");
-      wrap.className = "topic";
-
-      const left = document.createElement("div");
-      left.style.flex = "1";
-
-      left.innerHTML = `
-        <h3>${topic.title}</h3>
-        <p><b>Soba:</b> ${topic.room} • ${topic.description}</p>
-        <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
-          <span class="badge">Kviz A: ${aRes ? (aRes.score + "/100") : "—"}</span>
-          <span class="badge">Kviz B: ${bRes ? (bRes.score + "/100") : "—"}</span>
-          <span class="badge">🔑 Ključ: ${topic.key}</span>
-        </div>
-      `;
-
-      const actions = document.createElement("div");
-      actions.className = "topic-actions";
-
-      const btnA = document.createElement("button");
-      btnA.className = "btn btn-primary";
-      btnA.textContent = aPassed ? "✅ Kviz A (ponovo)" : "Kviz A";
-      btnA.disabled = !s;
-      btnA.onclick = ()=> startQuiz(topic.id,"A");
-
-      const btnB = document.createElement("button");
-      btnB.className = "btn btn-outline";
-      btnB.textContent = bPassed ? "✅ Kviz B (ponovo)" : "Kviz B";
-      btnB.disabled = !s;
-      btnB.onclick = ()=> startQuiz(topic.id,"B");
-
-      const small = document.createElement("div");
-      small.className = "small";
-      small.innerHTML = !s ? "Unesi ime da otključaš kvizove." : "Izaberi kviz za svoju grupu.";
-
-      actions.appendChild(btnA);
-      actions.appendChild(btnB);
-      actions.appendChild(small);
-
-      wrap.appendChild(left);
-      wrap.appendChild(actions);
-      list.appendChild(wrap);
+      // Show progress
+      const progressDiv = document.getElementById("progressInfo");
+      if (progressDiv) {
+        progressDiv.innerHTML = `
+          <p>🎯 Sakupljeno ključeva: <strong>${cert.total}/10</strong></p>
+          ${cert.keys.length > 0 ? `<p>🔑 Tvoji ključevi: ${cert.keys.join(", ")}</p>` : ""}
+          ${cert.eligible ? '<p class="cert-ready">🏆 Spreman/na za sertifikat!</p>' : ""}
+        `;
+        progressDiv.style.display = "block";
+      }
     });
-
-    // CERTIFIKACIJA STATUS
-    if(s){
-      const cert = checkCertification(s, g);
-      const certBox = document.createElement("div");
-      certBox.className = cert.eligible ? "alert ok" : "alert";
-      certBox.style.marginTop = "20px";
-      certBox.innerHTML = `
-        <b>📊 Napredak certifikacije:</b> ${cert.total}/10 ključeva sakupljeno<br>
-        ${cert.eligible ? `🎓 <b>ČESTITAMO!</b> Možeš preuzeti <a href="certificate.html?student=${encodeURIComponent(s)}&group=${encodeURIComponent(g)}" style="color:var(--accent);text-decoration:underline;">SERTIFIKAT</a>!` : 'Nastavi sa kvizovima da dobiješ sertifikat!'}
-      `;
-      list.appendChild(certBox);
-    }
   }
 
-  function startQuiz(topicId, part){
-    persistForm();
-    const s = studentName.value.trim();
-    const g = ageGroup.value;
-    const url = `quiz.html?topic=${encodeURIComponent(topicId)}&part=${encodeURIComponent(part)}&group=${encodeURIComponent(g)}&student=${encodeURIComponent(s)}`;
-    location.href = url;
-  }
-
-  render();
-}
-
-/* ---------------------------
-   QUIZ PAGE
----------------------------- */
-function initQuiz(){
-  const gateCard = qs("#gateCard");
-  const quizCard = qs("#quizCard");
-  if(!gateCard || !quizCard) return;
-
-  const params = new URLSearchParams(location.search);
-  const topicId = params.get("topic");
-  const part = params.get("part"); // "A" or "B"
-  const group = params.get("group"); // "A" or "B"
-  const student = params.get("student");
-
-  const topic = QUIZ_DATA.topics.find(t=>t.id===topicId);
-  if(!topic){
-    gateCard.innerHTML = `<div class="alert">Tema nije pronađena.</div>`;
-    return;
-  }
-
-  const data = topic.quizzes?.[part];
-  if(!data || !data.length){
-    gateCard.innerHTML = `
-      <div class="h1">${topic.title}</div>
-      <div class="alert">Ovaj kviz još nije unesen za odabranu grupu/part.</div>
-      <a class="btn btn-primary" href="./">Nazad</a>
-    `;
-    return;
-  }
-
-  qs("#navTitle").textContent = `${topic.room} • ${topic.title} • Kviz ${part}`;
-
-  // QR gate
-  const qrImg = qs("#qrImg");
-  const gateCode = qs("#gateCode");
-  const unlockBtn = qs("#unlockBtn");
-  const regenBtn = qs("#regenBtn");
-  const gateMsg = qs("#gateMsg");
-
-  let currentCode = genCode(4);
-  function refreshQR(){
-    currentCode = genCode(4);
-    const url = buildQrUrl(currentCode);
-    setQrImage(qrImg, url);
-    gateCode.value = "";
-    gateMsg.style.display = "none";
-  }
-  refreshQR();
-
-  regenBtn.addEventListener("click", refreshQR);
-
-  unlockBtn.addEventListener("click", ()=>{
-    const typed = (gateCode.value || "").toUpperCase().trim();
-    if(typed !== currentCode){
-      gateMsg.style.display = "block";
-      gateMsg.textContent = "Kod nije tačan. Skeniraj QR ponovo ili klikni 'Novi QR'.";
-      return;
-    }
-    gateCard.style.display = "none";
-    quizCard.style.display = "block";
-    startRun();
-  });
-
-  qs("#fullscreenBtn").addEventListener("click", async ()=>{
-    try{
-      if(!document.fullscreenElement) await document.documentElement.requestFullscreen();
-      else await document.exitFullscreen();
-    }catch(e){}
-  });
-
-  function startRun(){
-    const minutes = QUIZ_DATA.meta.minutesPerQuiz ?? 10;
-    const totalSeconds = minutes * 60;
-    let remaining = totalSeconds;
-    let timer = null;
-
-    const timeLeft = qs("#timeLeft");
-    const liveScore = qs("#liveScore");
-    const whoBadge = qs("#whoBadge");
-    const metaLine = qs("#metaLine");
-    const progressBar = qs("#progressBar");
-    const qTitle = qs("#qTitle");
-    const optionsBox = qs("#options");
-    const helperNote = qs("#helperNote");
-    const prevBtn = qs("#prevBtn");
-    const nextBtn = qs("#nextBtn");
-
-    whoBadge.textContent = `👤 ${student} • Grupa ${group}`;
-    metaLine.textContent = `Soba: ${topic.room} • Kviz ${part} • 5 pitanja • prolaz ${QUIZ_DATA.meta.passScore}/100`;
-
-    const state = {
-      index: 0,
-      answers: {},
-      score: 0
-    };
-
-    function fmt(sec){
-      const m = Math.floor(sec/60);
-      const s = sec%60;
-      return String(m).padStart(2,"0")+":"+String(s).padStart(2,"0");
-    }
-
-    function computeScore(){
-      let total = 0;
-      const per = QUIZ_DATA.meta.pointsPerQuestion ?? 20;
-
-      data.forEach(q=>{
-        const sel = state.answers[q.id];
-        if(q.type === "single"){
-          if(sel === q.answer) total += per;
-        }else if(q.type === "multiple"){
-          const correct = new Set(q.answers || []);
-          const chosen = new Set(Array.isArray(sel) ? sel : []);
-          let correctChosen = 0;
-          let wrongChosen = 0;
-
-          chosen.forEach(x=>{
-            if(correct.has(x)) correctChosen++;
-            else wrongChosen++;
-          });
-
-          const maxCorrect = correct.size || 1;
-
-          if(q.scoring?.partialScale){
-            let ratio = (correctChosen / maxCorrect);
-            ratio = Math.max(0, ratio - (wrongChosen * 0.15));
-            total += Math.round(per * Math.max(0, Math.min(1, ratio)));
-          }else{
-            if(correctChosen === maxCorrect && wrongChosen === 0) total += (q.scoring?.full ?? per);
-            else if(correctChosen >= 1 && wrongChosen === 0) total += (q.scoring?.partial ?? Math.round(per/2));
-            else total += 0;
-          }
+  // Reset all data
+  if (resetBtn) {
+    resetBtn.addEventListener("click", () => {
+      if (!confirm("⚠️ Da li sigurno želiš obrisati SVE rezultate? Ova akcija se ne može poništiti!")) {
+        return;
+      }
+      
+      const keys = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key.startsWith("quiz_result_")) {
+          keys.push(key);
         }
-      });
-
-      state.score = Math.max(0, Math.min(100, total));
-      liveScore.textContent = state.score;
-    }
-
-    function renderQuestion(){
-      const q = data[state.index];
-      if(!q) return;
-
-      const pct = Math.round(((state.index) / data.length) * 100);
-      progressBar.style.width = pct + "%";
-
-      qTitle.textContent = `Pitanje ${state.index+1}/${data.length}: ${q.prompt}`;
-      optionsBox.innerHTML = "";
-      helperNote.textContent = "";
-
-      if(q.type === "single" || q.type === "scenario" || q.type === "analysis" || q.type === "critical"){
-        const current = state.answers[q.id] || "";
-        q.options.forEach(opt=>{
-          const row = document.createElement("label");
-          row.className = "opt";
-          row.innerHTML = `
-            <input type="radio" name="q_${q.id}" value="${opt.id}" ${current===opt.id ? "checked":""} />
-            <div><b>${opt.id})</b> ${opt.text}</div>
-          `;
-          row.addEventListener("click", (e)=>{
-            const input = row.querySelector("input");
-            input.checked = true;
-            state.answers[q.id] = opt.id;
-            computeScore();
-          });
-          optionsBox.appendChild(row);
-        });
-      }else if(q.type === "multiple"){
-        const current = new Set(Array.isArray(state.answers[q.id]) ? state.answers[q.id] : []);
-        q.options.forEach(opt=>{
-          const row = document.createElement("label");
-          row.className = "opt";
-          row.innerHTML = `
-            <input type="checkbox" value="${opt.id}" ${current.has(opt.id) ? "checked":""} />
-            <div><b>${opt.id})</b> ${opt.text}</div>
-          `;
-          row.addEventListener("click", (e)=>{
-            const input = row.querySelector("input");
-            input.checked = !input.checked;
-            const now = new Set(Array.isArray(state.answers[q.id]) ? state.answers[q.id] : []);
-            if(input.checked) now.add(opt.id);
-            else now.delete(opt.id);
-            state.answers[q.id] = Array.from(now);
-            computeScore();
-          });
-          optionsBox.appendChild(row);
-        });
-        helperNote.textContent = "Izaberi više odgovora (ako treba).";
       }
-
-      prevBtn.disabled = state.index === 0;
-      nextBtn.textContent = (state.index === data.length-1) ? "Završi ✅" : "Dalje →";
-    }
-
-    function finish(auto=false){
-      clearInterval(timer);
-
-      computeScore();
-      const pass = state.score >= (QUIZ_DATA.meta.passScore ?? 60);
-      const keyWord = topic.key; // ISTA KLJUČ
-
-      const payload = {
-        student,
-        group,
-        topicId,
-        topicTitle: topic.title,
-        room: topic.room,
-        part,
-        score: state.score,
-        passed: pass,
-        key: pass ? keyWord : null,
-        when: new Date().toISOString(),
-        autoFinish: auto
-      };
-
-      saveResult(student, group, topicId, part, payload);
-
-      const url = `result.html?topic=${encodeURIComponent(topicId)}&part=${encodeURIComponent(part)}&group=${encodeURIComponent(group)}&student=${encodeURIComponent(student)}`;
-      location.href = url;
-    }
-
-    prevBtn.addEventListener("click", ()=>{
-      if(state.index>0){
-        state.index--;
-        renderQuestion();
-      }
+      
+      keys.forEach(k => localStorage.removeItem(k));
+      localStorage.removeItem("currentStudent");
+      localStorage.removeItem("currentGroup");
+      
+      alert("✅ Svi rezultati su obrisani!");
+      location.reload();
     });
+  }
 
-    nextBtn.addEventListener("click", ()=>{
-      if(state.index === data.length-1){
-        finish(false);
-      }else{
-        state.index++;
-        renderQuestion();
-      }
+  // View certificate
+  if (certBtn) {
+    certBtn.addEventListener("click", () => {
+      location.href = "certificate.html";
     });
+  }
 
-    timeLeft.textContent = fmt(remaining);
-    timer = setInterval(()=>{
-      remaining--;
-      timeLeft.textContent = fmt(Math.max(0,remaining));
-      if(remaining <= 0){
-        finish(true);
-      }
-    }, 1000);
-
-    computeScore();
-    renderQuestion();
+  // Auto-render if student data exists
+  if (studentName && groupName) {
+    renderTopics(studentName, groupName);
+    const cert = checkCertification(studentName, groupName);
+    if (certBtn) {
+      certBtn.style.display = cert.eligible ? "inline-block" : "none";
+    }
   }
 }
 
-/* ---------------------------
-   RESULT PAGE
----------------------------- */
-function initResult(){
-  const box = qs("#resultCard");
-  if(!box) return;
+function renderTopics(studentName, groupName) {
+  const container = document.getElementById("topicsContainer");
+  if (!container || !QUIZ_DATA) return;
 
-  const params = new URLSearchParams(location.search);
-  const topicId = params.get("topic");
-  const part = params.get("part");
-  const group = params.get("group");
-  const student = params.get("student");
+  container.innerHTML = QUIZ_DATA.topics.map(topic => {
+    const resultKey = `quiz_result_${safeKey(studentName)}_${safeKey(groupName)}_${topic.id}`;
+    const result = localStorage.getItem(resultKey);
+    
+    let status = "";
+    let statusClass = "";
+    let keyBadge = "";
+    
+    if (result) {
+      const data = JSON.parse(result);
+      if (data.passed) {
+        status = `✅ Prošao/la (${data.score}/${data.maxScore})`;
+        statusClass = "status-passed";
+        keyBadge = `<span class="key-badge">🔑 ${data.key}</span>`;
+      } else {
+        status = `❌ Ponoviti (${data.score}/${data.maxScore})`;
+        statusClass = "status-failed";
+      }
+    }
 
-  const topic = QUIZ_DATA.topics.find(t=>t.id===topicId);
-  const res = loadResult(student, group, topicId, part);
-
-  if(!topic || !res){
-    box.innerHTML = `
-      <div class="alert">Rezultat nije pronađen.</div>
-      <a class="btn btn-primary" href="./">Nazad</a>
+    return `
+      <div class="topic-card ${statusClass}">
+        <div class="topic-icon">${topic.icon}</div>
+        <h3>${topic.title}</h3>
+        <p>${topic.description}</p>
+        ${keyBadge}
+        ${status ? `<p class="topic-status">${status}</p>` : ""}
+        <button onclick="startQuiz('${topic.id}', '${groupName}')" class="btn btn-primary">
+          🎮 ${status ? "Ponovi" : "Pokreni"} kviz
+        </button>
+      </div>
     `;
+  }).join("");
+}
+
+// Global function for starting quiz
+window.startQuiz = function(topicId, groupName) {
+  // Store current state
+  localStorage.setItem("pendingTopic", topicId);
+  localStorage.setItem("pendingGroup", groupName);
+  
+  // Redirect to quiz page
+  location.href = `quiz.html#topic=${topicId}&part=${groupName}`;
+};
+
+// ----------------------------------------------------------------------------
+// 5. QR GATE (quiz.html entry point)
+// ----------------------------------------------------------------------------
+
+function initQrGate() {
+  const gateDiv = document.getElementById("qrGate");
+  if (!gateDiv) return;
+
+  const hash = location.hash.slice(1);
+  const params = new URLSearchParams(hash);
+  
+  const topicId = params.get("topic") || localStorage.getItem("pendingTopic");
+  const part = params.get("part") || localStorage.getItem("pendingGroup");
+
+  if (!topicId || !part) {
+    alert("⚠️ Greška: Nedostaju podaci o temi!");
+    location.href = "index.html";
     return;
   }
 
-  const pass = !!res.passed;
-  const title = `${topic.title} • Kviz ${part}`;
-  const status = pass ? "✅ PASSED" : "🔄 RETRY";
-  const cls = pass ? "ok" : "alert";
+  const code = getPersistentCode(topicId, part);
+  const qrUrl = buildQrUrl(code);
+  const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(qrUrl)}`;
 
-  const keyLine = pass
-    ? `<div class="card" style="margin-top:14px;">
-         <div class="label">🔑 Ključ riječi (za certifikaciju)</div>
-         <div style="font-size:1.6rem; font-weight:900; color:var(--primary); letter-spacing:1px;">${res.key}</div>
-         <div class="note">Sačuvaj ključ za ovu temu. Kad sakupiš svih 10, dobijaš certifikat.</div>
-       </div>`
-    : `<div class="note" style="margin-top:10px;">Položi (≥ 60) da dobiješ ključ.</div>`;
+  // Find topic data
+  const topic = QUIZ_DATA.topics.find(t => t.id === topicId);
+  if (!topic) {
+    alert("⚠️ Tema nije pronađena!");
+    location.href = "index.html";
+    return;
+  }
 
-  box.innerHTML = `
-    <div class="h1">${title}</div>
-    <div class="sub">Učenik: <b>${student}</b> • Grupa <b>${group}</b> • Soba: <b>${topic.room}</b></div>
-
-    <div class="${cls}" style="margin-top:10px;">
-      <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap;">
-        <div><b>Status:</b> ${status}</div>
-        <div><b>Score:</b> ${res.score}/100</div>
+  // Display QR gate
+  gateDiv.innerHTML = `
+    <div class="qr-gate-card">
+      <h2>🔐 Verifikacija pristupa</h2>
+      <p>${topic.icon} <strong>${topic.title}</strong></p>
+      <p>Grupa: <strong>${part === "A" ? "A (9-11 god)" : "B (12-15 god)"}</strong></p>
+      
+      <div class="qr-section">
+        <h3>Za učenike - QR kod:</h3>
+        <img src="${qrApiUrl}" alt="QR kod" class="qr-image" />
+        <p class="qr-hint">Skeniraj kod mobilnim telefonom</p>
       </div>
-    </div>
 
-    ${keyLine}
+      <div class="code-section">
+        <h3>Unesi kod za pristup:</h3>
+        <p class="code-hint">Učenici će vidjeti kod nakon skeniranja</p>
+        <input type="text" id="codeInput" maxlength="4" placeholder="____" class="code-input" />
+        <button id="verifyBtn" class="btn btn-primary">✅ Verifikuj i nastavi</button>
+      </div>
 
-    <div class="row" style="justify-content:space-between; margin-top:16px;">
-      <a class="btn btn-outline" href="./">↩ Nazad</a>
-      <a class="btn btn-primary" href="quiz.html?topic=${encodeURIComponent(topicId)}&part=${encodeURIComponent(part)}&group=${encodeURIComponent(group)}&student=${encodeURIComponent(student)}">
-        Ponovi
-      </a>
+      <button onclick="location.href='index.html'" class="btn btn-outline">◀️ Nazad</button>
     </div>
   `;
 
-  // CERTIFIKACIJA CHECK
-  const cert = checkCertification(student, group);
-  
-  if(cert.eligible){
-    box.innerHTML += `
-      <div class="alert ok" style="margin-top:16px;">
-        🎓 <b>ČESTITAMO!</b> Sakupio si ${cert.total}/10 ključeva!
-        <br><br>
-        <a class="btn btn-primary" href="certificate.html?student=${encodeURIComponent(student)}&group=${encodeURIComponent(group)}" style="margin-top:8px;">
-          🏆 PREUZMI SERTIFIKAT
-        </a>
-      </div>
-    `;
-  } else {
-    box.innerHTML += `
-      <div class="note" style="margin-top:12px;">
-        📊 Napredak: ${cert.total}/10 ključeva sakupljeno<br>
-        Nastavi sa preostalim kvizovima!
-      </div>
-    `;
-  }
+  // Verify button handler
+  const verifyBtn = document.getElementById("verifyBtn");
+  const codeInput = document.getElementById("codeInput");
+
+  verifyBtn.addEventListener("click", () => {
+    const entered = codeInput.value.trim().toUpperCase();
+    if (entered === code) {
+      gateDiv.style.display = "none";
+      initQuiz(topicId, part);
+    } else {
+      alert("❌ Pogrešan kod! Pokušaj ponovo.");
+      codeInput.value = "";
+      codeInput.focus();
+    }
+  });
+
+  // Auto-focus and uppercase
+  codeInput.focus();
+  codeInput.addEventListener("input", (e) => {
+    e.target.value = e.target.value.toUpperCase();
+  });
+
+  // Enter key support
+  codeInput.addEventListener("keypress", (e) => {
+    if (e.key === "Enter") {
+      verifyBtn.click();
+    }
+  });
 }
 
-/* ---------------------------
-   Boot
----------------------------- */
-document.addEventListener("DOMContentLoaded", ()=>{
+// ----------------------------------------------------------------------------
+// 6. QUIZ ENGINE
+// ----------------------------------------------------------------------------
+
+function initQuiz(topicId, part) {
+  const quizDiv = document.getElementById("quizContainer");
+  if (!quizDiv) return;
+
+  const topic = QUIZ_DATA.topics.find(t => t.id === topicId);
+  if (!topic) {
+    alert("⚠️ Greška: Tema nije pronađena!");
+    return;
+  }
+
+  const questions = part === "A" ? topic.questionsA : topic.questionsB;
+  const studentName = localStorage.getItem("currentStudent") || "Učenik";
+
+  // Initialize state
+  currentState = {
+    studentName: studentName,
+    groupName: part,
+    topicId: topicId,
+    topicTitle: topic.title,
+    topicIcon: topic.icon,
+    topicKey: topic.key,
+    currentQuestionIndex: 0,
+    score: 0,
+    answers: [],
+    timeLeft: QUIZ_DATA.minutesPerQuiz * 60,
+    timerInterval: null,
+    questions: questions,
+    maxScore: questions.length * 20
+  };
+
+  quizDiv.style.display = "block";
+  renderQuestion();
+  startTimer();
+}
+
+function startTimer() {
+  const timerEl = document.getElementById("timeLeft");
+  if (!timerEl) return;
+
+  currentState.timerInterval = setInterval(() => {
+    currentState.timeLeft--;
+    
+    const mins = Math.floor(currentState.timeLeft / 60);
+    const secs = currentState.timeLeft % 60;
+    timerEl.textContent = `${mins}:${secs.toString().padStart(2, "0")}`;
+
+    // Warning at 1 minute
+    if (currentState.timeLeft === 60) {
+      timerEl.style.color = "#f59e0b";
+      alert("⏰ Preostao je 1 minut!");
+    }
+
+    // Time's up
+    if (currentState.timeLeft <= 0) {
+      clearInterval(currentState.timerInterval);
+      alert("⏰ Vrijeme je isteklo!");
+      finishQuiz();
+    }
+  }, 1000);
+}
+
+function renderQuestion() {
+  const q = currentState.questions[currentState.currentQuestionIndex];
+  const container = document.getElementById("questionContainer");
+  if (!container) return;
+
+  // Update progress
+  document.getElementById("currentQuestion").textContent = currentState.currentQuestionIndex + 1;
+  document.getElementById("totalQuestions").textContent = currentState.questions.length;
+  document.getElementById("currentScore").textContent = currentState.score;
+
+  // Render question
+  const optionsHtml = q.options.map((opt, idx) => {
+    const inputType = q.correctAnswer.length > 1 ? "checkbox" : "radio";
+    const inputName = inputType === "radio" ? "answer" : `answer_${idx}`;
+    
+    return `
+      <label class="option-label">
+        <input type="${inputType}" name="${inputName}" value="${idx}" />
+        <span>${opt}</span>
+      </label>
+    `;
+  }).join("");
+
+  container.innerHTML = `
+    <div class="question-card">
+      <div class="question-header">
+        <span class="question-number">Pitanje ${currentState.currentQuestionIndex + 1}</span>
+        <span class="question-points">20 bodova</span>
+      </div>
+      <h3 class="question-text">${q.question}</h3>
+      <div class="options-container">
+        ${optionsHtml}
+      </div>
+      <div class="question-actions">
+        <button onclick="submitAnswer()" class="btn btn-primary">
+          ${currentState.currentQuestionIndex === currentState.questions.length - 1 ? "🏁 Završi" : "➡️ Dalje"}
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+window.submitAnswer = function() {
+  const q = currentState.questions[currentState.currentQuestionIndex];
+  let selectedAnswers = [];
+
+  if (q.correctAnswer.length > 1) {
+    // Multiple choice
+    document.querySelectorAll('input[type="checkbox"]:checked').forEach(input => {
+      selectedAnswers.push(parseInt(input.value));
+    });
+  } else {
+    // Single choice
+    const selected = document.querySelector('input[type="radio"]:checked');
+    if (selected) {
+      selectedAnswers.push(parseInt(selected.value));
+    }
+  }
+
+  if (selectedAnswers.length === 0) {
+    alert("⚠️ Molim te izaberi odgovor!");
+    return;
+  }
+
+  // Check if correct
+  const isCorrect = 
+    selectedAnswers.length === q.correctAnswer.length &&
+    selectedAnswers.every(a => q.correctAnswer.includes(a));
+
+  if (isCorrect) {
+    currentState.score += 20;
+  }
+
+  currentState.answers.push({
+    question: q.question,
+    selected: selectedAnswers,
+    correct: q.correctAnswer,
+    isCorrect: isCorrect
+  });
+
+  // Next question or finish
+  if (currentState.currentQuestionIndex < currentState.questions.length - 1) {
+    currentState.currentQuestionIndex++;
+    renderQuestion();
+  } else {
+    finishQuiz();
+  }
+};
+
+function finishQuiz() {
+  clearInterval(currentState.timerInterval);
+
+  const passed = currentState.score >= QUIZ_DATA.passingScore;
+  const percentage = Math.round((currentState.score / currentState.maxScore) * 100);
+
+  let rank = "";
+  if (currentState.score >= 90) rank = "🏆 Cyber Pro";
+  else if (currentState.score >= 75) rank = "⭐ Cyber Smart";
+  else if (currentState.score >= 60) rank = "✅ Položio/la";
+  else rank = "🔄 Pokušaj ponovo";
+
+  // Save result
+  const result = {
+    studentName: currentState.studentName,
+    groupName: currentState.groupName,
+    topicId: currentState.topicId,
+    topicTitle: currentState.topicTitle,
+    topicIcon: currentState.topicIcon,
+    score: currentState.score,
+    maxScore: currentState.maxScore,
+    percentage: percentage,
+    passed: passed,
+    key: passed ? currentState.topicKey : null,
+    rank: rank,
+    timestamp: new Date().toISOString(),
+    answers: currentState.answers
+  };
+
+  const resultKey = `quiz_result_${safeKey(currentState.studentName)}_${safeKey(currentState.groupName)}_${currentState.topicId}`;
+  localStorage.setItem(resultKey, JSON.stringify(result));
+
+  // Redirect to result page
+  location.href = `result.html#result=${resultKey}`;
+}
+
+// ----------------------------------------------------------------------------
+// 7. RESULT PAGE
+// ----------------------------------------------------------------------------
+
+function initResult() {
+  const container = document.getElementById("resultContainer");
+  if (!container) return;
+
+  const hash = location.hash.slice(1);
+  const params = new URLSearchParams(hash);
+  const resultKey = params.get("result");
+
+  if (!resultKey) {
+    alert("⚠️ Greška: Rezultat nije pronađen!");
+    location.href = "index.html";
+    return;
+  }
+
+  const resultData = localStorage.getItem(resultKey);
+  if (!resultData) {
+    alert("⚠️ Greška: Rezultat nije pronađen u bazi!");
+    location.href = "index.html";
+    return;
+  }
+
+  const result = JSON.parse(resultData);
+
+  // Check certification
+  const cert = checkCertification(result.studentName, result.groupName);
+
+  container.innerHTML = `
+    <div class="result-card ${result.passed ? 'passed' : 'failed'}">
+      <div class="result-icon">${result.passed ? '🎉' : '😞'}</div>
+      <h1>${result.passed ? 'Čestitamo!' : 'Pokušaj ponovo'}</h1>
+      
+      <div class="result-info">
+        <h2>${result.topicIcon} ${result.topicTitle}</h2>
+        <p class="student-info">Učenik: <strong>${result.studentName}</strong> | Grupa: <strong>${result.groupName}</strong></p>
+      </div>
+
+      <div class="score-display">
+        <div class="score-circle">
+          <div class="score-value">${result.score}</div>
+          <div class="score-max">/ ${result.maxScore}</div>
+        </div>
+        <div class="score-details">
+          <p class="percentage">${result.percentage}%</p>
+          <p class="rank">${result.rank}</p>
+        </div>
+      </div>
+
+      ${result.passed ? `
+        <div class="key-display">
+          <h3>🔑 Tvoj ključ</h3>
+          <div class="key-value">${result.key}</div>
+          <p class="key-hint">Zapamti ovaj ključ! Nakon 10 ključeva dobijaš sertifikat.</p>
+        </div>
+      ` : `
+        <div class="retry-message">
+          <p>💪 Ne odustaj! Potrebno je minimum ${QUIZ_DATA.passingScore} bodova za prolaz.</p>
+          <p>Prouči materijal još jednom i pokušaj ponovo!</p>
+        </div>
+      `}
+
+      <div class="progress-info">
+        <h3>📊 Tvoj napredak</h3>
+        <p>Sakupljeno ključeva: <strong>${cert.total}/10</strong></p>
+        ${cert.keys.length > 0 ? `<p>🔑 ${cert.keys.join(", ")}</p>` : ""}
+        
+        ${cert.eligible ? `
+          <div class="cert-ready">
+            <p>🏆 <strong>Čestitamo! Sakupio/la si svih 10 ključeva!</strong></p>
+            <button onclick="location.href='certificate.html'" class="btn btn-primary">
+              📜 Preuzmi sertifikat
+            </button>
+          </div>
+        ` : ""}
+      </div>
+
+      <div class="result-actions">
+        <button onclick="location.href='index.html'" class="btn btn-primary">🏠 Početna</button>
+        <button onclick="location.href='quiz.html#topic=${result.topicId}&part=${result.groupName}'" class="btn btn-outline">
+          🔄 Ponovi kviz
+        </button>
+      </div>
+    </div>
+  `;
+}
+
+// ----------------------------------------------------------------------------
+// 8. BOOTSTRAP
+// ----------------------------------------------------------------------------
+
+document.addEventListener("DOMContentLoaded", () => {
   initTheme();
-  initIndex();
-  initQuiz();
-  initResult();
+
+  const path = location.pathname;
+  
+  if (path.includes("index.html") || path.endsWith("/")) {
+    initIndex();
+  } else if (path.includes("quiz.html")) {
+    initQrGate();
+  } else if (path.includes("result.html")) {
+    initResult();
+  }
 });
