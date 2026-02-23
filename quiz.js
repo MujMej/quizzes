@@ -1,14 +1,14 @@
-// quiz.js
+// quiz.js - FINALNA VERZIJA
 
 /* ---------------------------
-   Theme toggle (same logic)
+   Theme toggle
 ---------------------------- */
 function setTheme(isDark){
   if(isDark) document.body.classList.add("dark-mode");
   else document.body.classList.remove("dark-mode");
   localStorage.setItem("darkMode", String(isDark));
   const t = document.getElementById("themeToggle");
-  if(t) t.innerText = isDark ? "Light mode" : "Dark mode";
+  if(t) t.innerText = isDark ? "☀️ Light" : "🌙 Dark";
 }
 
 function initTheme(){
@@ -22,7 +22,7 @@ function initTheme(){
 }
 
 /* ---------------------------
-   Helpers / Storage
+   Helpers
 ---------------------------- */
 function qs(sel){ return document.querySelector(sel); }
 function qsa(sel){ return Array.from(document.querySelectorAll(sel)); }
@@ -53,8 +53,7 @@ function resetAll(){
 }
 
 /* ---------------------------
-   QR gate (soft verification)
-   - generate code -> QR links to verify.html?code=XXXX
+   QR gate
 ---------------------------- */
 function genCode(len=4){
   const chars = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
@@ -70,14 +69,42 @@ function buildQrUrl(code){
   return base + "?code=" + encodeURIComponent(code);
 }
 
-// Uses an external QR image generator (simple). If offline, QR won’t render but code still works.
 function setQrImage(imgEl, qrUrl){
   const url = "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=" + encodeURIComponent(qrUrl);
   imgEl.src = url;
 }
 
 /* ---------------------------
-   INDEX PAGE: render topics
+   Certification check
+---------------------------- */
+function checkCertification(student, group){
+  const topics = QUIZ_DATA.topics;
+  let keysCollected = [];
+  
+  topics.forEach(topic => {
+    const resA = loadResult(student, group, topic.id, "A");
+    const resB = loadResult(student, group, topic.id, "B");
+    
+    // ISTA KLJUČ za obe grupe
+    if(resA?.passed || resB?.passed){
+      if(!keysCollected.includes(topic.key)){
+        keysCollected.push(topic.key);
+      }
+    }
+  });
+  
+  const totalKeys = keysCollected.length;
+  const needsCertificate = totalKeys >= QUIZ_DATA.meta.totalTopics;
+  
+  return {
+    keys: keysCollected,
+    total: totalKeys,
+    eligible: needsCertificate
+  };
+}
+
+/* ---------------------------
+   INDEX PAGE
 ---------------------------- */
 function initIndex(){
   const list = qs("#topicsList");
@@ -87,7 +114,6 @@ function initIndex(){
   const ageGroup = qs("#ageGroup");
   const resetBtn = qs("#resetLocal");
 
-  // restore form
   studentName.value = localStorage.getItem("cyberedu_student") || "";
   ageGroup.value = localStorage.getItem("cyberedu_group") || "A";
 
@@ -100,7 +126,7 @@ function initIndex(){
   ageGroup.addEventListener("change", ()=>{ persistForm(); render(); });
 
   resetBtn.addEventListener("click", ()=>{
-    if(confirm("Resetovati sve rezultate za ovaj browser?")){
+    if(confirm("Resetovati sve rezultate?")){
       resetAll();
       render();
     }
@@ -129,9 +155,9 @@ function initIndex(){
         <h3>${topic.title}</h3>
         <p><b>Soba:</b> ${topic.room} • ${topic.description}</p>
         <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
-          <span class="badge">Quiz A: ${aRes ? (aRes.score + "/100") : "—"}</span>
-          <span class="badge">Quiz B: ${bRes ? (bRes.score + "/100") : "—"}</span>
-          <span class="badge">Ključ: ${topic.keys[g]}</span>
+          <span class="badge">Kviz A: ${aRes ? (aRes.score + "/100") : "—"}</span>
+          <span class="badge">Kviz B: ${bRes ? (bRes.score + "/100") : "—"}</span>
+          <span class="badge">🔑 Ključ: ${topic.key}</span>
         </div>
       `;
 
@@ -140,19 +166,19 @@ function initIndex(){
 
       const btnA = document.createElement("button");
       btnA.className = "btn btn-primary";
-      btnA.textContent = aPassed ? "Quiz A ✔ (ponovo)" : "Pokreni Quiz A";
+      btnA.textContent = aPassed ? "✅ Kviz A (ponovo)" : "Kviz A";
       btnA.disabled = !s;
       btnA.onclick = ()=> startQuiz(topic.id,"A");
 
       const btnB = document.createElement("button");
       btnB.className = "btn btn-outline";
-      btnB.textContent = bPassed ? "Quiz B ✔ (ponovo)" : "Pokreni Quiz B";
-      btnB.disabled = !s || !aPassed; // locked until A passed
+      btnB.textContent = bPassed ? "✅ Kviz B (ponovo)" : "Kviz B";
+      btnB.disabled = !s;
       btnB.onclick = ()=> startQuiz(topic.id,"B");
 
       const small = document.createElement("div");
       small.className = "small";
-      small.innerHTML = !s ? "Unesi ime da otključaš kvizove." : (!aPassed ? "Quiz B je zaključan dok se Quiz A ne položi." : "Quiz B otključan ✅");
+      small.innerHTML = !s ? "Unesi ime da otključaš kvizove." : "Izaberi kviz za svoju grupu.";
 
       actions.appendChild(btnA);
       actions.appendChild(btnB);
@@ -162,6 +188,19 @@ function initIndex(){
       wrap.appendChild(actions);
       list.appendChild(wrap);
     });
+
+    // CERTIFIKACIJA STATUS
+    if(s){
+      const cert = checkCertification(s, g);
+      const certBox = document.createElement("div");
+      certBox.className = cert.eligible ? "alert ok" : "alert";
+      certBox.style.marginTop = "20px";
+      certBox.innerHTML = `
+        <b>📊 Napredak certifikacije:</b> ${cert.total}/10 ključeva sakupljeno<br>
+        ${cert.eligible ? `🎓 <b>ČESTITAMO!</b> Možeš preuzeti <a href="certificate.html?student=${encodeURIComponent(s)}&group=${encodeURIComponent(g)}" style="color:var(--accent);text-decoration:underline;">SERTIFIKAT</a>!` : 'Nastavi sa kvizovima da dobiješ sertifikat!'}
+      `;
+      list.appendChild(certBox);
+    }
   }
 
   function startQuiz(topicId, part){
@@ -195,23 +234,19 @@ function initQuiz(){
     return;
   }
 
-  // choose dataset by group & part
-  const data = topic.quizzes?.[part]?.[group === "A" ? "groupA" : "groupB"] || [];
-  if(!data.length){
+  const data = topic.quizzes?.[part];
+  if(!data || !data.length){
     gateCard.innerHTML = `
       <div class="h1">${topic.title}</div>
-      <div class="sub">Ovaj kviz još nije unesen za odabranu grupu/part.</div>
-      <div class="alert">Dodaj pitanja u <b>data.js</b> za topic <b>${topicId}</b>, part <b>${part}</b>, grupa <b>${group}</b>.</div>
-      <div style="height:12px;"></div>
+      <div class="alert">Ovaj kviz još nije unesen za odabranu grupu/part.</div>
       <a class="btn btn-primary" href="./">Nazad</a>
     `;
     return;
   }
 
-  // NAV title
-  qs("#navTitle").textContent = `${topic.room} • ${topic.title} • Quiz ${part}`;
+  qs("#navTitle").textContent = `${topic.room} • ${topic.title} • Kviz ${part}`;
 
-  // QR gate setup
+  // QR gate
   const qrImg = qs("#qrImg");
   const gateCode = qs("#gateCode");
   const unlockBtn = qs("#unlockBtn");
@@ -234,7 +269,7 @@ function initQuiz(){
     const typed = (gateCode.value || "").toUpperCase().trim();
     if(typed !== currentCode){
       gateMsg.style.display = "block";
-      gateMsg.textContent = "Kod nije tačan. Neka učenik ponovo skenira QR ili klikni 'Novi QR'.";
+      gateMsg.textContent = "Kod nije tačan. Skeniraj QR ponovo ili klikni 'Novi QR'.";
       return;
     }
     gateCard.style.display = "none";
@@ -242,7 +277,6 @@ function initQuiz(){
     startRun();
   });
 
-  // full screen (nice for projector)
   qs("#fullscreenBtn").addEventListener("click", async ()=>{
     try{
       if(!document.fullscreenElement) await document.documentElement.requestFullscreen();
@@ -268,11 +302,11 @@ function initQuiz(){
     const nextBtn = qs("#nextBtn");
 
     whoBadge.textContent = `👤 ${student} • Grupa ${group}`;
-    metaLine.textContent = `Soba: ${topic.room} • Quiz ${part} • 5 pitanja • prolaz ${QUIZ_DATA.meta.passScore}/100`;
+    metaLine.textContent = `Soba: ${topic.room} • Kviz ${part} • 5 pitanja • prolaz ${QUIZ_DATA.meta.passScore}/100`;
 
     const state = {
       index: 0,
-      answers: {}, // qid -> selected
+      answers: {},
       score: 0
     };
 
@@ -303,14 +337,11 @@ function initQuiz(){
 
           const maxCorrect = correct.size || 1;
 
-          // scoring modes
           if(q.scoring?.partialScale){
-            // scaled by correctness, penalize wrong picks lightly
             let ratio = (correctChosen / maxCorrect);
             ratio = Math.max(0, ratio - (wrongChosen * 0.15));
             total += Math.round(per * Math.max(0, Math.min(1, ratio)));
           }else{
-            // full/partial (classic)
             if(correctChosen === maxCorrect && wrongChosen === 0) total += (q.scoring?.full ?? per);
             else if(correctChosen >= 1 && wrongChosen === 0) total += (q.scoring?.partial ?? Math.round(per/2));
             else total += 0;
@@ -326,7 +357,6 @@ function initQuiz(){
       const q = data[state.index];
       if(!q) return;
 
-      // progress
       const pct = Math.round(((state.index) / data.length) * 100);
       progressBar.style.width = pct + "%";
 
@@ -334,7 +364,7 @@ function initQuiz(){
       optionsBox.innerHTML = "";
       helperNote.textContent = "";
 
-      if(q.type === "single"){
+      if(q.type === "single" || q.type === "scenario" || q.type === "analysis" || q.type === "critical"){
         const current = state.answers[q.id] || "";
         q.options.forEach(opt=>{
           const row = document.createElement("label");
@@ -362,7 +392,7 @@ function initQuiz(){
           `;
           row.addEventListener("click", (e)=>{
             const input = row.querySelector("input");
-            input.checked = !input.checked; // label click toggles
+            input.checked = !input.checked;
             const now = new Set(Array.isArray(state.answers[q.id]) ? state.answers[q.id] : []);
             if(input.checked) now.add(opt.id);
             else now.delete(opt.id);
@@ -381,10 +411,9 @@ function initQuiz(){
     function finish(auto=false){
       clearInterval(timer);
 
-      // compute final
       computeScore();
       const pass = state.score >= (QUIZ_DATA.meta.passScore ?? 60);
-      const keyWord = topic.keys[group];
+      const keyWord = topic.key; // ISTA KLJUČ
 
       const payload = {
         student,
@@ -422,7 +451,6 @@ function initQuiz(){
       }
     });
 
-    // timer
     timeLeft.textContent = fmt(remaining);
     timer = setInterval(()=>{
       remaining--;
@@ -432,7 +460,6 @@ function initQuiz(){
       }
     }, 1000);
 
-    // start
     computeScore();
     renderQuestion();
   }
@@ -456,15 +483,14 @@ function initResult(){
 
   if(!topic || !res){
     box.innerHTML = `
-      <div class="alert">Rezultat nije pronađen. Vrati se na teme i pokreni kviz.</div>
-      <div style="height:12px;"></div>
+      <div class="alert">Rezultat nije pronađen.</div>
       <a class="btn btn-primary" href="./">Nazad</a>
     `;
     return;
   }
 
   const pass = !!res.passed;
-  const title = `${topic.title} • Quiz ${part}`;
+  const title = `${topic.title} • Kviz ${part}`;
   const status = pass ? "✅ PASSED" : "🔄 RETRY";
   const cls = pass ? "ok" : "alert";
 
@@ -472,7 +498,7 @@ function initResult(){
     ? `<div class="card" style="margin-top:14px;">
          <div class="label">🔑 Ključ riječi (za certifikaciju)</div>
          <div style="font-size:1.6rem; font-weight:900; color:var(--primary); letter-spacing:1px;">${res.key}</div>
-         <div class="note">Sačuvaj ključ za ovu temu. Kad sakupiš svih 10, dobijaš završni certifikat.</div>
+         <div class="note">Sačuvaj ključ za ovu temu. Kad sakupiš svih 10, dobijaš certifikat.</div>
        </div>`
     : `<div class="note" style="margin-top:10px;">Položi (≥ 60) da dobiješ ključ.</div>`;
 
@@ -490,16 +516,34 @@ function initResult(){
     ${keyLine}
 
     <div class="row" style="justify-content:space-between; margin-top:16px;">
-      <a class="btn btn-outline" href="./">↩ Nazad na teme</a>
+      <a class="btn btn-outline" href="./">↩ Nazad</a>
       <a class="btn btn-primary" href="quiz.html?topic=${encodeURIComponent(topicId)}&part=${encodeURIComponent(part)}&group=${encodeURIComponent(group)}&student=${encodeURIComponent(student)}">
-        Ponovi kviz
+        Ponovi
       </a>
     </div>
-
-    <div class="note" style="margin-top:12px;">
-      Napomena: rezultat je spremljen lokalno u browseru. Ako promijeniš uređaj/browser — neće ga vidjeti.
-    </div>
   `;
+
+  // CERTIFIKACIJA CHECK
+  const cert = checkCertification(student, group);
+  
+  if(cert.eligible){
+    box.innerHTML += `
+      <div class="alert ok" style="margin-top:16px;">
+        🎓 <b>ČESTITAMO!</b> Sakupio si ${cert.total}/10 ključeva!
+        <br><br>
+        <a class="btn btn-primary" href="certificate.html?student=${encodeURIComponent(student)}&group=${encodeURIComponent(group)}" style="margin-top:8px;">
+          🏆 PREUZMI SERTIFIKAT
+        </a>
+      </div>
+    `;
+  } else {
+    box.innerHTML += `
+      <div class="note" style="margin-top:12px;">
+        📊 Napredak: ${cert.total}/10 ključeva sakupljeno<br>
+        Nastavi sa preostalim kvizovima!
+      </div>
+    `;
+  }
 }
 
 /* ---------------------------
