@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="bs">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sertifikat – Cyber Heroji</title>
+  <link rel="stylesheet" href="./quiz.css" />
+  <style>
+    .certificate {
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 60px 40px;
+      background: linear-gradient(135deg, #0F6B52 0%, #0B2F28 100%);
+      border: 8px solid #D9B35A;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      color: #fff;
+      text-align: center;
+    }
+    .cert-logo {
+      font-size: 4rem;
+      margin-bottom: 20px;
+    }
+    .cert-title {
+      font-size: 2.5rem;
+      font-weight: 900;
+      margin: 0 0 10px;
+      color: #D9B35A;
+    }
+    .cert-subtitle {
+      font-size: 1.2rem;
+      opacity: 0.9;
+      margin-bottom: 30px;
+    }
+    .cert-name {
+      font-size: 2.8rem;
+      font-weight: 700;
+      margin: 20px 0;
+      color: #fff;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+    .cert-body {
+      font-size: 1.1rem;
+      line-height: 1.8;
+      margin: 20px 0;
+      opacity: 0.95;
+    }
+    .cert-keys {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+      margin: 30px 0;
+    }
+    .key-badge {
+      background: rgba(255,255,255,0.15);
+      padding: 12px;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 1rem;
+      border: 2px solid rgba(217,179,90,0.5);
+    }
+    .cert-footer {
+      margin-top: 40px;
+      padding-top: 30px;
+      border-top: 2px solid rgba(255,255,255,0.2);
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+    .cert-sign {
+      text-align: left;
+      flex: 1;
+    }
+    .cert-date {
+      text-align: right;
+      flex: 1;
+    }
+    .cert-id {
+      margin-top: 20px;
+      font-size: 0.9rem;
+      opacity: 0.7;
+      font-family: monospace;
+    }
+    @media print {
+      body { background: #fff; }
+      nav, .btn { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="q-nav">
+    <div class="logo">Cyber Heroji – Sertifikat</div>
+    <div class="nav-right">
+      <button class="btn btn-color-2" onclick="window.print()">🖨️ Štampaj</button>
+      <a class="btn btn-primary" href="./">Nazad</a>
+    </div>
+  </nav>
+
+  <main class="q-wrap">
+    <div class="certificate" id="cert"></div>
+  </main>
+
+  <script src="./data.js"></script>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const student = params.get("student") || "Učesnik";
+    const group = params.get("group") || "A";
+    
+    const groupTitle = group === "A" ? "Junior Cyber Explorer" : "Young Cyber Defender";
+    const ageRange = group === "A" ? "9-11 godina" : "11-15 godina";
+    
+    // Generiši jedinstveni ID
+    const certId = "CSA-" + new Date().getFullYear() + "-" + 
+                    Math.random().toString(36).substr(2, 5).toUpperCase();
+    
+    // Sakupi ključeve
+    let keys = [];
+    QUIZ_DATA.topics.forEach(topic => {
+      const resA = localStorage.getItem(`cyberedu_result__${student.toLowerCase().replace(/\s+/g,"_")}__${group.toLowerCase()}__${topic.id}__A`);
+      const resB = localStorage.getItem(`cyberedu_result__${student.toLowerCase().replace(/\s+/g,"_")}__${group.toLowerCase()}__${topic.id}__B`);
+      
+      if(resA){
+        const data = JSON.parse(resA);
+        if(data.passed) keys.push(data.key);
+      }
+      if(resB){
+        const data = JSON.parse(resB);
+        if(data.passed) keys.push(data.key);
+      }
+    });
+    
+    const today = new Date().toLocaleDateString("bs-BA", {
+      day: "numeric",
+      month: "long",
+      year: "numeric"
+    });
+    
+    document.getElementById("cert").innerHTML = `
+      <div class="cert-logo">🏆</div>
+      <h1 class="cert-title">SERTIFIKAT POSTIGNUĆA</h1>
+      <p class="cert-subtitle">Cyber Sigurnost za Djecu – Online Akademija</p>
+      
+      <div class="cert-body">
+        Ovim putem se potvrđuje da je
+      </div>
+      
+      <div class="cert-name">${student}</div>
+      
+      <div class="cert-body">
+        uspješno završio/la kompletni program edukacije o sajber bezbjednosti<br>
+        za uzrast <b>${ageRange}</b> i stekao/la zvanje:
+      </div>
+      
+      <div style="font-size:2rem; font-weight:900; color:#D9B35A; margin:20px 0;">
+        ${groupTitle}
+      </div>
+      
+      <div class="cert-body">
+        Učesnik je položio <b>${keys.length} tema</b> i sakupio sljedeće ključeve:
+      </div>
+      
+      <div class="cert-keys">
+        ${keys.map(k => `<div class="key-badge">🔑 ${k}</div>`).join("")}
+      </div>
+      
+      <div class="cert-footer">
+        <div class="cert-sign">
+          <div style="font-weight:700;">Edukator:</div>
+          <div style="margin-top:5px;">_______________________</div>
+          <div style="margin-top:5px; opacity:0.8; font-size:0.9rem;">Cyber Heroji Tim</div>
+        </div>
+        <div class="cert-date">
+          <div style="font-weight:700;">Datum:</div>
+          <div style="margin-top:5px;">${today}</div>
+        </div>
+      </div>
+      
+      <div class="cert-id">
+        Jedinstveni ID sertifikata: ${certId}
+      </div>
+    `;
+  </script>
+</body>
+</html>
