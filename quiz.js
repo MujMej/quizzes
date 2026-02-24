@@ -1,9 +1,8 @@
 // ============================================================
-// CYBER HEROJI — Quiz Engine
+// CYBER HEROJI — Quiz Engine  (ISPRAVLJENA VERZIJA)
 // Repo: https://mujmej.github.io/quizzes/
 // ============================================================
 
-// Fallback ikone ako data.js nema topic.icon
 const TOPIC_ICONS = ["🌳","👣","🔐","🛡️","🎭","🧠","💬","🔍","🤖","🚨"];
 
 // ----------------------------------------------------------
@@ -29,6 +28,7 @@ function getPersistentCode(topicId, part) {
 }
 
 function buildQrUrl(code) {
+  // FIX: ispravna URL adresa verify.html
   return "https://mujmej.github.io/quizzes/verify.html?code=" + encodeURIComponent(code);
 }
 
@@ -52,13 +52,50 @@ function checkCertification(studentName, groupName) {
   return { eligible: arr.length >= 10, keys: arr, total: arr.length };
 }
 
-// Dohvati pitanja - podržava i questionsA i questions_a i questions[part]
+// FIX: Dohvati pitanja - data.js koristi topic.quizzes.A / topic.quizzes.B
 function getQuestions(topic, part) {
+  // Novi format: topic.quizzes.A ili topic.quizzes.B
+  if (topic.quizzes && topic.quizzes[part]) return topic.quizzes[part];
+  // Stari formati kao fallback
   if (part === "A") {
     return topic.questionsA || topic.questions_a || topic.questionsGroup_A || null;
   } else {
     return topic.questionsB || topic.questions_b || topic.questionsGroup_B || null;
   }
+}
+
+// FIX: Vrati tekst opcije (data.js ima {id,text} objekte ILI plain string)
+function getOptionText(opt) {
+  if (typeof opt === "string") return opt;
+  if (opt && typeof opt === "object" && opt.text) return opt.text;
+  return String(opt);
+}
+
+// FIX: Pretvori slova u indekse  "A"->0, "B"->1, itd.
+function letterToIndex(letter) {
+  return letter.charCodeAt(0) - 65; // "A"=65
+}
+
+// FIX: Dohvati tačne indekse odgovora iz pitanja (podržava i stari i novi format)
+function getCorrectIndices(q) {
+  // Novi format: q.answer = "B" ili q.answers = ["A","B"]
+  if (q.answers && Array.isArray(q.answers)) {
+    return q.answers.map(a => typeof a === "string" && a.length === 1 && isNaN(a)
+      ? letterToIndex(a) : parseInt(a));
+  }
+  if (q.answer !== undefined) {
+    const a = q.answer;
+    if (typeof a === "string" && a.length === 1 && isNaN(a)) return [letterToIndex(a)];
+    return [parseInt(a)];
+  }
+  // Stari format: q.correctAnswer
+  if (q.correctAnswer !== undefined) {
+    const ca = q.correctAnswer;
+    if (Array.isArray(ca)) return ca.map(x => parseInt(x));
+    if (typeof ca === "string" && ca.length === 1 && isNaN(ca)) return [letterToIndex(ca)];
+    return [parseInt(ca)];
+  }
+  return [0];
 }
 
 // ----------------------------------------------------------
@@ -123,7 +160,7 @@ function renderTopics() {
   if (!container) return;
 
   if (typeof QUIZ_DATA === "undefined") {
-    container.innerHTML = `<p style="color:red;">⚠️ data.js nije učitan! Provjeri da li je fajl u repou.</p>`;
+    container.innerHTML = `<p style="color:red;padding:1rem;">⚠️ data.js nije učitan! Provjeri da li je fajl u repou.</p>`;
     return;
   }
 
@@ -133,7 +170,6 @@ function renderTopics() {
     ? checkCertification(studentName, groupName)
     : { total: 0, keys: [], eligible: false };
 
-  // --- progress banner ---
   let progressHtml = "";
   if (studentName) {
     progressHtml = `
@@ -150,9 +186,7 @@ function renderTopics() {
       </div>`;
   }
 
-  // --- topic rows ---
   const rows = QUIZ_DATA.topics.map((topic, idx) => {
-    // Ikonica s fallback-om
     const icon = topic.icon || TOPIC_ICONS[idx] || "📚";
 
     let pA = false, pB = false, sA = null, sB = null;
@@ -223,14 +257,13 @@ function initQuiz() {
                       || localStorage.getItem("currentStudent")
                       || "Učenik";
 
-  // Provjeri data.js
   if (typeof QUIZ_DATA === "undefined") {
     gateCard.innerHTML = `<p style="color:red">⚠️ data.js nije učitan! <a href="index.html">Nazad</a></p>`;
     return;
   }
 
   if (!topicId || !part) {
-    gateCard.innerHTML = `<p style="color:red">⚠️ Nedostaju parametri (topic/part). <a href="index.html">Nazad</a></p>`;
+    gateCard.innerHTML = `<p style="color:red">⚠️ Nedostaju parametri. <a href="index.html">Nazad</a></p>`;
     return;
   }
 
@@ -240,13 +273,19 @@ function initQuiz() {
     return;
   }
 
-  // Provjeri da li postoje pitanja
+  // FIX: Koristimo ispravljenu getQuestions() koja podržava topic.quizzes.A
   const testQuestions = getQuestions(topic, part);
   if (!testQuestions || testQuestions.length === 0) {
     gateCard.innerHTML = `
-      <p style="color:red">⚠️ Pitanja za temu "${topic.title}" (Grupa ${part}) nisu pronađena u data.js.</p>
-      <p style="color:#6b7280;margin-top:8px;">Provjeri da data.js ima <code>questionsA</code> i <code>questionsB</code> polja.</p>
-      <a href="index.html" class="btn btn-primary" style="margin-top:12px;display:inline-block;">Nazad</a>`;
+      <div style="padding:1.5rem;">
+        <p style="color:red;font-weight:700;">⚠️ Pitanja za "${topic.title}" (Grupa ${part}) nisu pronađena.</p>
+        <p style="color:#6b7280;margin-top:8px;font-size:.9rem;">
+          data.js treba imati strukturu:<br>
+          <code>topic.quizzes.A = [...]</code><br>
+          <code>topic.quizzes.B = [...]</code>
+        </p>
+        <a href="index.html" class="btn btn-primary" style="margin-top:14px;display:inline-block;">← Nazad</a>
+      </div>`;
     return;
   }
 
@@ -264,7 +303,6 @@ function initQuiz() {
   const qrImg = document.getElementById("qrImg");
   if (qrImg) qrImg.src = qrApiUrl;
 
-  // Gate controls
   const gateCode  = document.getElementById("gateCode");
   const unlockBtn = document.getElementById("unlockBtn");
   const regenBtn  = document.getElementById("regenBtn");
@@ -290,7 +328,7 @@ function initQuiz() {
         gateCard.style.display = "none";
         startQuizSession(topicId, part, studentName, topic);
       } else {
-        showGateError("❌ Pogrešan kod! Učenik treba skenirati QR i vidjeti tačan kod.");
+        showGateError("❌ Pogrešan kod! Učenik treba skenirati QR.");
         if (gateCode) { gateCode.value = ""; gateCode.focus(); }
       }
     });
@@ -299,12 +337,11 @@ function initQuiz() {
   if (regenBtn) {
     regenBtn.addEventListener("click", () => {
       if (!confirm("Generisati novi QR kod za ovu temu?")) return;
-      localStorage.setItem(`qr_code_${topicId}_${part}`, genCode(4));
+      localStorage.removeItem(`qr_code_${topicId}_${part}`);
       location.reload();
     });
   }
 
-  // Prev/Next pre-bind (rade kad quizState bude postavljen)
   document.getElementById("prevBtn")?.addEventListener("click", () => {
     if (!quizState || quizState.currentIndex === 0) return;
     quizState.currentIndex--;
@@ -316,11 +353,11 @@ function initQuiz() {
 
 function startQuizSession(topicId, part, studentName, topic) {
   const quizCard = document.getElementById("quizCard");
-  if (!quizCard) { console.error("quizCard element not found!"); return; }
+  if (!quizCard) { console.error("quizCard not found!"); return; }
 
   const questions = getQuestions(topic, part);
   if (!questions || questions.length === 0) {
-    alert("⚠️ Pitanja nisu pronađena za ovu temu/grupu!");
+    alert("⚠️ Pitanja nisu pronađena!");
     location.href = "index.html";
     return;
   }
@@ -339,7 +376,7 @@ function startQuizSession(topicId, part, studentName, topic) {
     score:        0,
     answers:      [],
     maxScore:     questions.length * 20,
-    timeLeft:     (QUIZ_DATA.minutesPerQuiz || 10) * 60,
+    timeLeft:     (QUIZ_DATA.meta?.minutesPerQuiz || QUIZ_DATA.minutesPerQuiz || 10) * 60,
     timerInterval: null
   };
 
@@ -352,7 +389,6 @@ function startQuizSession(topicId, part, studentName, topic) {
   quizCard.style.display = "block";
   quizCard.scrollIntoView({ behavior: "smooth" });
 
-  // Fullscreen
   const fsBtn = document.getElementById("fullscreenBtn");
   if (fsBtn) {
     fsBtn.addEventListener("click", () => {
@@ -397,47 +433,47 @@ function renderQuizQuestion() {
   const q     = questions[currentIndex];
   const total = questions.length;
 
-  // Progress bar
   const pb = document.getElementById("progressBar");
   if (pb) pb.style.width = `${(currentIndex / total) * 100}%`;
 
-  // Live score
   const ls = document.getElementById("liveScore");
   if (ls) ls.textContent = score;
 
-  // Question text
+  // FIX: podržava i q.prompt (data.js) i q.question (stari format)
   const qTitle = document.getElementById("qTitle");
-  if (qTitle) qTitle.textContent = `(${currentIndex + 1}/${total})  ${q.question}`;
+  if (qTitle) qTitle.textContent = `(${currentIndex + 1}/${total})  ${q.prompt || q.question || ""}`;
 
-  // Options
   const optsDiv = document.getElementById("options");
   if (optsDiv) {
-    const correct   = Array.isArray(q.correctAnswer) ? q.correctAnswer : [q.correctAnswer];
-    const isMulti   = correct.length > 1;
-    const inputType = isMulti ? "checkbox" : "radio";
+    // FIX: dohvati tačne indekse (iz slova ili direktno)
+    const correctIndices = getCorrectIndices(q);
+    const isMulti        = correctIndices.length > 1;
+    const inputType      = isMulti ? "checkbox" : "radio";
 
-    optsDiv.innerHTML = q.options.map((opt, i) => `
-      <label style="display:flex;align-items:center;gap:10px;padding:10px 14px;margin:6px 0;
-             border-radius:8px;border:1px solid var(--border,#e5e7eb);cursor:pointer;
-             background:var(--surface,#f9fafb);" 
-             onmouseover="this.style.borderColor='#10b981'"
-             onmouseout="this.style.borderColor='var(--border,#e5e7eb)'">
-        <input type="${inputType}" name="opt" value="${i}"
-               style="width:18px;height:18px;cursor:pointer;accent-color:#10b981;" />
-        <span style="font-size:.95rem;">${opt}</span>
-      </label>`).join("");
+    // FIX: opcije mogu biti {id,text} objekti ili plain stringovi
+    optsDiv.innerHTML = q.options.map((opt, i) => {
+      const text = getOptionText(opt);
+      return `
+        <label style="display:flex;align-items:flex-start;gap:10px;padding:12px 14px;margin:6px 0;
+               border-radius:8px;border:1px solid var(--border,#e5e7eb);cursor:pointer;
+               background:var(--surface,#f9fafb);"
+               onmouseover="this.style.borderColor='#10b981'"
+               onmouseout="this.style.borderColor='var(--border,#e5e7eb)'">
+          <input type="${inputType}" name="opt" value="${i}"
+                 style="width:18px;height:18px;margin-top:2px;cursor:pointer;accent-color:#10b981;flex-shrink:0;" />
+          <span style="font-size:.95rem;line-height:1.5;">${text}</span>
+        </label>`;
+    }).join("");
   }
 
-  // Helper note
   const helper = document.getElementById("helperNote");
   if (helper) {
-    const correct = Array.isArray(q.correctAnswer) ? q.correctAnswer : [q.correctAnswer];
-    helper.textContent = correct.length > 1
+    const correctIndices = getCorrectIndices(q);
+    helper.textContent = correctIndices.length > 1
       ? "✏️ Može biti više tačnih odgovora — označi sve tačne."
       : "✏️ Izaberi jedan tačan odgovor.";
   }
 
-  // Button states
   const prevBtn = document.getElementById("prevBtn");
   const nextBtn = document.getElementById("nextBtn");
   if (prevBtn) {
@@ -449,9 +485,11 @@ function renderQuizQuestion() {
 
 function handleAnswer() {
   if (!quizState) return;
-  const q       = quizState.questions[quizState.currentIndex];
-  const correct = Array.isArray(q.correctAnswer) ? q.correctAnswer : [q.correctAnswer];
-  const isMulti = correct.length > 1;
+  const q = quizState.questions[quizState.currentIndex];
+
+  // FIX: koristi ispravljenu getCorrectIndices()
+  const correctIndices = getCorrectIndices(q);
+  const isMulti        = correctIndices.length > 1;
 
   let selected = [];
   if (isMulti) {
@@ -463,10 +501,30 @@ function handleAnswer() {
 
   if (!selected.length) { alert("⚠️ Izaberi odgovor!"); return; }
 
-  const isCorrect = selected.length === correct.length && selected.every(a => correct.includes(a));
-  if (isCorrect) quizState.score += 20;
+  // Provjera tačnosti
+  const isCorrect = selected.length === correctIndices.length
+    && selected.every(a => correctIndices.includes(a));
 
-  quizState.answers.push({ question: q.question, selected, correct, isCorrect });
+  // Parcijalni bodovi za multiple-choice (ako data.js ima scoring.partial)
+  let points = 0;
+  if (isCorrect) {
+    points = 20;
+  } else if (isMulti && q.scoring?.partial) {
+    const correctSelected = selected.filter(a => correctIndices.includes(a));
+    if (correctSelected.length > 0 && selected.length <= correctIndices.length) {
+      points = q.scoring.partial;
+    }
+  }
+  quizState.score += points;
+
+  quizState.answers.push({
+    question: q.prompt || q.question,
+    selected,
+    correctIndices,
+    isCorrect,
+    points,
+    explain: q.explain || ""
+  });
 
   if (quizState.currentIndex < quizState.questions.length - 1) {
     quizState.currentIndex++;
@@ -480,7 +538,7 @@ function finishQuizSession() {
   if (!quizState) return;
   clearInterval(quizState.timerInterval);
 
-  const passed     = quizState.score >= (QUIZ_DATA.passingScore || 60);
+  const passed     = quizState.score >= (QUIZ_DATA.meta?.passScore || QUIZ_DATA.passingScore || 60);
   const percentage = Math.round((quizState.score / quizState.maxScore) * 100);
   let rank = "🔄 Pokušaj ponovo";
   if (quizState.score >= 90)      rank = "🏆 Cyber Pro";
@@ -511,32 +569,44 @@ function finishQuizSession() {
 // RESULT PAGE
 // ----------------------------------------------------------
 function initResult() {
-  const container = document.getElementById("resultContainer");
+  // FIX: result.html koristi id="resultCard", ne "resultContainer"
+  const container = document.getElementById("resultCard") || document.getElementById("resultContainer");
   if (!container) return;
 
   const rKey = new URLSearchParams(location.search).get("result");
   if (!rKey) { location.href = "index.html"; return; }
 
   const raw = localStorage.getItem(rKey);
-  if (!raw) { alert("Rezultat nije pronađen."); location.href = "index.html"; return; }
+  if (!raw) {
+    container.innerHTML = `
+      <div style="text-align:center;padding:2rem;">
+        <div style="font-size:3rem;">😕</div>
+        <p style="margin:1rem 0;font-weight:700;">Rezultat nije pronađen.</p>
+        <p style="color:#6b7280;font-size:.9rem;">Možda su podaci obrisani ili je ovo nova sesija.</p>
+        <a href="index.html" class="btn btn-primary" style="display:inline-block;margin-top:1rem;">← Nazad na teme</a>
+      </div>`;
+    return;
+  }
 
   const r    = JSON.parse(raw);
   const cert = checkCertification(r.studentName, r.groupName);
 
   container.innerHTML = `
-    <div class="card" style="max-width:560px;margin:0 auto;text-align:center;">
+    <div style="max-width:560px;margin:0 auto;text-align:center;padding:1.5rem;">
       <div style="font-size:4rem;margin-bottom:.75rem;">${r.passed ? "🎉" : "😞"}</div>
-      <div class="h1">${r.passed ? "Čestitamo!" : "Pokušaj ponovo"}</div>
-      <div style="font-size:1.15rem;font-weight:700;margin:.5rem 0;">
+      <h2 style="font-size:1.75rem;font-weight:900;margin-bottom:.5rem;">${r.passed ? "Čestitamo!" : "Pokušaj ponovo"}</h2>
+      <div style="font-size:1.1rem;font-weight:700;margin:.25rem 0;">
         ${r.topicIcon || ""} ${r.topicTitle}
       </div>
-      <div class="sub">👤 ${r.studentName} &nbsp;·&nbsp; Grupa ${r.groupName}</div>
+      <div style="font-size:.9rem;color:#6b7280;margin-bottom:1.25rem;">
+        👤 ${r.studentName} &nbsp;·&nbsp; Grupa ${r.groupName}
+      </div>
 
-      <div style="font-size:3.5rem;font-weight:900;color:var(--primary,#10b981);margin:1rem 0 .25rem;">
+      <div style="font-size:3.5rem;font-weight:900;color:#10b981;margin:1rem 0 .25rem;">
         ${r.score}<span style="font-size:1.4rem;font-weight:400;color:#9ca3af;">/${r.maxScore}</span>
       </div>
       <div style="font-size:1rem;color:#6b7280;margin-bottom:.25rem;">${r.percentage}%</div>
-      <div style="font-size:1.25rem;font-weight:700;margin-bottom:1.5rem;">${r.rank}</div>
+      <div style="font-size:1.2rem;font-weight:700;margin-bottom:1.5rem;">${r.rank}</div>
 
       ${r.passed ? `
         <div style="background:linear-gradient(135deg,#10b981,#f59e0b);color:#fff;
@@ -546,11 +616,10 @@ function initResult() {
           <div style="font-size:.82rem;opacity:.85;margin-top:.5rem;">Zapamti! 10 ključeva = sertifikat 🏆</div>
         </div>` : `
         <div style="background:#fee2e2;color:#991b1b;padding:1.25rem;border-radius:12px;margin-bottom:1.5rem;">
-          💪 Minimum 60 bodova za prolaz. Pokušaj ponovo!
+          💪 Minimum je ${r.maxScore * 0.6} bodova za prolaz. Pokušaj ponovo!
         </div>`}
 
-      <div style="background:var(--surface,#f0fdf4);padding:1.25rem;border-radius:10px;
-           margin-bottom:1.5rem;text-align:left;">
+      <div style="background:#f0fdf4;padding:1.25rem;border-radius:10px;margin-bottom:1.5rem;text-align:left;">
         <div style="font-weight:700;margin-bottom:.5rem;">📊 Ukupan napredak</div>
         <div>Ključevi: <strong>${cert.total}/10</strong></div>
         ${cert.keys.length ? `<div style="font-size:.85rem;color:#6b7280;margin-top:3px;">🔑 ${cert.keys.join(" · ")}</div>` : ""}
@@ -561,7 +630,7 @@ function initResult() {
           </div>` : ""}
       </div>
 
-      <div class="row" style="justify-content:center;gap:12px;flex-wrap:wrap;">
+      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
         <button onclick="location.href='index.html'" class="btn btn-primary">🏠 Teme</button>
         <button onclick="location.href='quiz.html?topic=${r.topicId}&part=${r.groupName}&student=${encodeURIComponent(r.studentName)}'"
                 class="btn btn-outline">🔄 Ponovi</button>
